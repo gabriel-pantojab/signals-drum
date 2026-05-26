@@ -1,17 +1,5 @@
-export type Listener<T> = (value: T) => void;
-export type Unsubscribe = () => void;
-type Subscribe<T> = (listener: Listener<T>) => Unsubscribe;
-
-export interface Signal<T> {
-  (): T;
-  subscribe: (listener: Listener<T>) => Unsubscribe;
-}
-
-export interface WritableSignal<T> extends Signal<T> {
-  set: (value: T) => void;
-  update: (callback: (prev: T) => T) => void;
-  asReadonly: () => Signal<T>;
-}
+import { context } from "./context";
+import type { Listener, Signal, Subscribe, Unsubscribe, WritableSignal } from "./types";
 
 export function signal<T>(initialValue: T): WritableSignal<T> {
   let value: T = initialValue;
@@ -25,11 +13,29 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
   };
 
   const notify: () => void = () => {
-    listeners.forEach((listener) => listener(value));
+    const currentListeners: Set<Listener<T>> = new Set(listeners);
+    currentListeners.forEach((listener) => listener(value));
   };
 
-  const signalFunction: WritableSignal<T> = () => value;
-  const signalReadonly: Signal<T> = () => value;
+  const trackInContext = (): void => {
+    const lastContextListener: Listener<T> | undefined = context.getLastListener();
+
+    if (lastContextListener) {
+      const unsubscribe: Unsubscribe = signalFunction.subscribe(lastContextListener);
+      context.addUnsubscribe(unsubscribe);
+    }
+  };
+
+  const signalFunction: WritableSignal<T> = () => {
+    trackInContext();
+    return value;
+  };
+
+  const signalReadonly: Signal<T> = () => {
+    trackInContext();
+    return value;
+  };
+
   signalReadonly.subscribe = subscribe;
 
   signalFunction.set = (newValue: T) => {
