@@ -5,7 +5,7 @@ import dts from "vite-plugin-dts";
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(import.meta.dirname, "src/index.ts"),
+      entry: resolve(import.meta.dirname, "src/lib/index.ts"),
       name: "SignalsDrum",
       fileName: "signals-drum",
       formats: ["es", "cjs"],
