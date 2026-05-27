@@ -56,9 +56,7 @@ describe("computed", () => {
     it("stops tracking a dependency that is no longer read", () => {
       const showDetails: WritableSignal<boolean> = signal(true);
       const name: WritableSignal<string> = signal("gabriel");
-      const computeSpy = vi.fn<() => string>(() =>
-        showDetails() ? name() : "hidden",
-      );
+      const computeSpy = vi.fn<() => string>(() => (showDetails() ? name() : "hidden"));
       const detail: Signal<string> = computed(computeSpy);
 
       expect(detail()).toBe("gabriel");
@@ -76,9 +74,7 @@ describe("computed", () => {
     it("starts tracking a new dependency when it becomes reachable", () => {
       const showDetails: WritableSignal<boolean> = signal(false);
       const name: WritableSignal<string> = signal("gabriel");
-      const detail: Signal<string> = computed(() =>
-        showDetails() ? name() : "hidden",
-      );
+      const detail: Signal<string> = computed(() => (showDetails() ? name() : "hidden"));
 
       expect(detail()).toBe("hidden");
 
