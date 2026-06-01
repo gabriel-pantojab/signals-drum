@@ -1,8 +1,9 @@
 import { context } from "./context";
 import { signal } from "./signal";
-import type { Signal, Unsubscribe, WritableSignal } from "./types";
+import type { Listener, Signal, Unsubscribe, WritableSignal } from "./types";
 
 export function computed<T>(callback: () => T): Signal<T> {
+  let internalSignal: WritableSignal<T> | undefined = undefined;
   const unsubscribes: Unsubscribe[] = [];
 
   const recompute: () => T = () => {
@@ -21,10 +22,25 @@ export function computed<T>(callback: () => T): Signal<T> {
   };
 
   const listener: () => void = () => {
+    if (!internalSignal) return;
+
     internalSignal.set(recompute());
   };
 
-  const internalSignal: WritableSignal<T> = signal(recompute());
+  const getSafeInternalSignal: () => WritableSignal<T> = () => {
+    if (!internalSignal) {
+      internalSignal = signal(recompute());
+    }
+    return internalSignal;
+  };
 
-  return internalSignal.asReadonly();
+  const readonlySignal: Signal<T> = () => {
+    return getSafeInternalSignal()();
+  };
+
+  readonlySignal.subscribe = (listener: Listener<T>) => {
+    return getSafeInternalSignal().subscribe(listener);
+  };
+
+  return readonlySignal;
 }
