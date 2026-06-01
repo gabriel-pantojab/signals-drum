@@ -1,5 +1,12 @@
 import { context } from "./context";
-import type { Listener, Signal, Subscribe, Unsubscribe, WritableSignal } from "./types";
+import type {
+  ContextListener,
+  Listener,
+  Signal,
+  Subscribe,
+  Unsubscribe,
+  WritableSignal,
+} from "./types";
 
 export function signal<T>(initialValue: T): WritableSignal<T> {
   let value: T = initialValue;
@@ -18,11 +25,22 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
   };
 
   const trackInContext = (): void => {
-    const lastContextListener: Listener<T> | undefined = context.getLastListener();
+    const lastContextListener: ContextListener | undefined = context.getLastListener();
 
     if (lastContextListener) {
-      const unsubscribe: Unsubscribe = signalFunction.subscribe(lastContextListener);
+      const unsubscribe: Unsubscribe = subscribe(lastContextListener.listener);
       context.addUnsubscribe(unsubscribe);
+    }
+  };
+
+  const validateMutation = (): void => {
+    const lastContextListener: ContextListener | undefined = context.getLastListener();
+    if (lastContextListener?.type === "computed") {
+      throw Error("Writing to signals is not allowed in a computed");
+    }
+
+    if (lastContextListener?.type === "effect" && listeners.has(lastContextListener.listener)) {
+      throw Error("Cannot write to a signal that is a dependency of the current effect.");
     }
   };
 
@@ -39,12 +57,16 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
   signalReadonly.subscribe = subscribe;
 
   signalFunction.set = (newValue: T) => {
+    validateMutation();
+
     if (newValue === value) return;
     value = newValue;
     notify();
   };
 
   signalFunction.update = (callback: (prev: T) => T) => {
+    validateMutation();
+
     const newValue: T = callback(value);
     if (newValue === value) return;
     value = newValue;

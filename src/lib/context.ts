@@ -1,11 +1,11 @@
-import type { Context, Unsubscribe } from "./types";
+import type { Context, ContextListener, Unsubscribe } from "./types";
 
 function createContext(): Context {
-  const listeners: Array<() => void> = [];
+  const listeners: Array<ContextListener> = [];
   const unsubscribes: Unsubscribe[] = [];
 
   return {
-    addListener: (listener: () => void) => listeners.push(listener),
+    pushListener: (listener: ContextListener) => listeners.push(listener),
     popLastListener: () => listeners.pop(),
     getLastListener: () => listeners.at(-1),
     addUnsubscribe: (unsubscribe: Unsubscribe) => unsubscribes.push(unsubscribe),
