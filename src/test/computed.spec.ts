@@ -224,6 +224,26 @@ describe("computed", () => {
     });
   });
 
+  describe("write guard", () => {
+    it("throws when attempting to set a signal inside a computed", () => {
+      const count: WritableSignal<number> = signal(0);
+      const bad: Signal<number> = computed(() => {
+        count.set(1);
+        return count();
+      });
+      expect(() => bad()).toThrow("Writing to signals is not allowed in a computed");
+    });
+
+    it("throws when attempting to update a signal inside a computed", () => {
+      const count: WritableSignal<number> = signal(0);
+      const bad: Signal<number> = computed(() => {
+        count.update((n) => n + 1);
+        return count();
+      });
+      expect(() => bad()).toThrow("Writing to signals is not allowed in a computed");
+    });
+  });
+
   describe("readonly contract", () => {
     it("does not expose a set method", () => {
       const computed$ = computed(() => 1);

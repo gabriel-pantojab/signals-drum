@@ -143,6 +143,39 @@ describe("effect", () => {
     });
   });
 
+  describe("write guard", () => {
+    it("throws when an effect sets a signal it depends on", () => {
+      const counter: WritableSignal<number> = signal(0);
+      expect(() => {
+        effect(() => {
+          const value = counter();
+          counter.set(value + 1);
+        });
+      }).toThrow("Cannot write to a signal that is a dependency of the current effect.");
+    });
+
+    it("throws when an effect updates a signal it depends on", () => {
+      const counter: WritableSignal<number> = signal(0);
+      expect(() => {
+        effect(() => {
+          counter();
+          counter.update((n) => n + 1);
+        });
+      }).toThrow("Cannot write to a signal that is a dependency of the current effect.");
+    });
+
+    it("does not throw when an effect writes to a signal that is not a dependency", () => {
+      const source: WritableSignal<number> = signal(0);
+      const other: WritableSignal<number> = signal(10);
+      expect(() => {
+        effect(() => {
+          source();
+          other.set(99);
+        });
+      }).not.toThrow();
+    });
+  });
+
   describe("unsubscribe", () => {
     it("stops re-running after unsubscribe", () => {
       const counter: WritableSignal<number> = signal(0);
