@@ -10,9 +10,11 @@ describe("computed", () => {
       expect(upperName()).toBe("GABRIEL");
     });
 
-    it("evaluates callback immediately on creation", () => {
+    it("does not evaluate callback on creation, only on first read", () => {
       const computeSpy = vi.fn<() => number>(() => 42);
-      computed(computeSpy);
+      const c = computed(computeSpy);
+      expect(computeSpy).not.toHaveBeenCalled();
+      c();
       expect(computeSpy).toHaveBeenCalledOnce();
     });
   });
