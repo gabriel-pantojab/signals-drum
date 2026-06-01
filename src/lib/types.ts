@@ -13,10 +13,15 @@ export interface WritableSignal<T> extends Signal<T> {
   asReadonly: () => Signal<T>;
 }
 
+export interface ContextListener {
+  type: "computed" | "effect";
+  listener: () => void;
+}
+
 export interface Context {
-  addListener: (listener: () => void) => void;
-  popLastListener: () => (() => void) | undefined;
-  getLastListener: () => (() => void) | undefined;
+  pushListener: (listener: ContextListener) => void;
+  popLastListener: () => ContextListener | undefined;
+  getLastListener: () => ContextListener | undefined;
   addUnsubscribe: (unsubscribe: Unsubscribe) => void;
   getUnsubscribes: () => Unsubscribe[];
 }

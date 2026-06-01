@@ -9,7 +9,10 @@ export function computed<T>(callback: () => T): Signal<T> {
     for (const unsubscribe of unsubscribes) {
       unsubscribe();
     }
-    context.addListener(listener);
+    context.pushListener({
+      type: "computed",
+      listener,
+    });
     const value = callback();
     unsubscribes.length = 0;
     unsubscribes.push(...context.getUnsubscribes());

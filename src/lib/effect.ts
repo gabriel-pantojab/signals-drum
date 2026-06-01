@@ -12,7 +12,10 @@ export function effect(callback: (onCleanup: (fn: () => void) => void) => void):
     for (const unsubscribe of unsubscribes) {
       unsubscribe();
     }
-    context.addListener(() => run());
+    context.pushListener({
+      type: "effect",
+      listener: () => run(),
+    });
     callback(onCleanup);
     unsubscribes.length = 0;
     unsubscribes.push(...context.getUnsubscribes());
