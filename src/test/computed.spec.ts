@@ -1,6 +1,6 @@
 import { expect, it, describe, vi } from "vitest";
 import { signal, computed } from "../lib";
-import type { Signal, WritableSignal, Unsubscribe } from "../lib/types";
+import type { Signal, WritableSignal } from "../lib/types";
 
 describe("computed", () => {
   describe("initial value", () => {
@@ -46,10 +46,11 @@ describe("computed", () => {
       doubled();
       doubled();
 
-      // Once on creation, zero more on reads
       expect(computeSpy).toHaveBeenCalledOnce();
 
       counter.set(1);
+      expect(computeSpy).toHaveBeenCalledOnce(); // lazy — dep changed but not yet read
+      doubled();
       expect(computeSpy).toHaveBeenCalledTimes(2);
     });
   });
@@ -89,38 +90,6 @@ describe("computed", () => {
     });
   });
 
-  describe("subscribe", () => {
-    it("notifies subscriber when the computed value changes", () => {
-      const counter: WritableSignal<number> = signal(0);
-      const doubled: Signal<number> = computed(() => counter() * 2);
-      const onChangeSpy = vi.fn<(value: number) => void>();
-      doubled.subscribe(onChangeSpy);
-      counter.set(3);
-      expect(onChangeSpy).toHaveBeenCalledWith(6);
-    });
-
-    it("does not notify subscriber if recomputed value is the same", () => {
-      const counter: WritableSignal<number> = signal(2);
-      const isEven: Signal<boolean> = computed(() => counter() % 2 === 0);
-      const onChangeSpy = vi.fn<(value: boolean) => void>();
-      isEven.subscribe(onChangeSpy);
-
-      // 2 → 4: isEven stays true — no notification expected
-      counter.set(4);
-      expect(onChangeSpy).not.toHaveBeenCalled();
-    });
-
-    it("stops notifications after unsubscribe", () => {
-      const counter: WritableSignal<number> = signal(0);
-      const doubled: Signal<number> = computed(() => counter() * 2);
-      const onChangeSpy = vi.fn<(value: number) => void>();
-      const stopListening: Unsubscribe = doubled.subscribe(onChangeSpy);
-      stopListening();
-      counter.set(5);
-      expect(onChangeSpy).not.toHaveBeenCalled();
-    });
-  });
-
   describe("multiple computed from the same signal", () => {
     it("each computed updates independently", () => {
       const counter: WritableSignal<number> = signal(2);
@@ -133,33 +102,15 @@ describe("computed", () => {
       expect(tripled()).toBe(15);
     });
 
-    it("each computed notifies its own subscribers independently", () => {
+    it("each computed derives its own value independently", () => {
       const counter: WritableSignal<number> = signal(0);
       const doubled: Signal<number> = computed(() => counter() * 2);
       const isPositive: Signal<boolean> = computed(() => counter() > 0);
-      const onDoubledChange = vi.fn<(value: number) => void>();
-      const onIsPositiveChange = vi.fn<(value: boolean) => void>();
-      doubled.subscribe(onDoubledChange);
-      isPositive.subscribe(onIsPositiveChange);
 
       counter.set(3);
 
-      expect(onDoubledChange).toHaveBeenCalledWith(6);
-      expect(onIsPositiveChange).toHaveBeenCalledWith(true);
-    });
-
-    it("one computed updating does not trigger the other if their values differ", () => {
-      const name: WritableSignal<string> = signal("gabriel");
-      const upper: Signal<string> = computed(() => name().toUpperCase());
-      const length: Signal<number> = computed(() => name().length);
-      const onLengthChange = vi.fn<(value: number) => void>();
-      length.subscribe(onLengthChange);
-
-      // Same length — length computed must not notify
-      name.set("GABRIEL");
-
-      expect(upper()).toBe("GABRIEL");
-      expect(onLengthChange).not.toHaveBeenCalled();
+      expect(doubled()).toBe(6);
+      expect(isPositive()).toBe(true);
     });
   });
 
@@ -181,18 +132,6 @@ describe("computed", () => {
 
       expect(doubled()).toBe(6);
       expect(quadrupled()).toBe(12);
-    });
-
-    it("notifies a subscriber at the end of a chain", () => {
-      const counter: WritableSignal<number> = signal(1);
-      const doubled: Signal<number> = computed(() => counter() * 2);
-      const quadrupled: Signal<number> = computed(() => doubled() * 2);
-      const onChangeSpy = vi.fn<(value: number) => void>();
-      quadrupled.subscribe(onChangeSpy);
-
-      counter.set(3);
-
-      expect(onChangeSpy).toHaveBeenCalledWith(12);
     });
 
     it("supports a three-level chain", () => {
@@ -253,6 +192,11 @@ describe("computed", () => {
     it("does not expose an update method", () => {
       const computed$ = computed(() => 1);
       expect((computed$ as unknown as Record<string, unknown>).update).toBeUndefined();
+    });
+
+    it("does not expose a subscribe method", () => {
+      const computed$ = computed(() => 1);
+      expect((computed$ as unknown as Record<string, unknown>).subscribe).toBeUndefined();
     });
   });
 });

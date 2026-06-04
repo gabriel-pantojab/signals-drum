@@ -11,6 +11,7 @@ import type {
 export function signal<T>(initialValue: T): WritableSignal<T> {
   let value: T = initialValue;
   const listeners: Set<Listener<T>> = new Set<Listener<T>>();
+  const contextListeners: Set<ContextListener> = new Set<ContextListener>();
 
   const subscribe: Subscribe<T> = (listener: Listener<T>): Unsubscribe => {
     listeners.add(listener);
@@ -20,16 +21,26 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
   };
 
   const notify: () => void = () => {
-    const currentListeners: Set<Listener<T>> = new Set(listeners);
-    currentListeners.forEach((listener) => listener(value));
+    context.startScheduling();
+    listeners.forEach((listener) => context.addPendingListener(listener, value));
+
+    // Use a snapshot of the current listeners to prevent mutations
+    // during notification dispatch from affecting this iteration.
+    [...contextListeners].forEach((contextListener) => {
+      if (contextListener.type === "computed") {
+        contextListener.listener();
+      } else {
+        context.addPendingListener(contextListener.listener, value);
+      }
+    });
   };
 
   const trackInContext = (): void => {
     const lastContextListener: ContextListener | undefined = context.getLastListener();
 
     if (lastContextListener) {
-      const unsubscribe: Unsubscribe = subscribe(lastContextListener.listener);
-      context.addUnsubscribe(unsubscribe);
+      contextListeners.add(lastContextListener);
+      context.addUnsubscribe(() => contextListeners.delete(lastContextListener));
     }
   };
 
@@ -39,7 +50,7 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
       throw Error("Writing to signals is not allowed in a computed");
     }
 
-    if (lastContextListener?.type === "effect" && listeners.has(lastContextListener.listener)) {
+    if (lastContextListener?.type === "effect" && contextListeners.has(lastContextListener)) {
       throw Error("Cannot write to a signal that is a dependency of the current effect.");
     }
   };
@@ -53,8 +64,6 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
     trackInContext();
     return value;
   };
-
-  signalReadonly.subscribe = subscribe;
 
   signalFunction.set = (newValue: T) => {
     validateMutation();

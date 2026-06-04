@@ -17,7 +17,7 @@ describe("effect", () => {
   });
 
   describe("reactivity", () => {
-    it("re-runs when a tracked signal changes", () => {
+    it("re-runs when a tracked signal changes", async () => {
       const name: WritableSignal<string> = signal("gabriel");
       const callbackSpy = vi.fn<() => void>(() => {
         name();
@@ -25,11 +25,12 @@ describe("effect", () => {
       effect(callbackSpy);
 
       name.set("pantoja");
+      await Promise.resolve();
 
       expect(callbackSpy).toHaveBeenCalledTimes(2);
     });
 
-    it("re-runs when any of multiple tracked signals change", () => {
+    it("re-runs when any of multiple tracked signals change", async () => {
       const firstName: WritableSignal<string> = signal("gabriel");
       const lastName: WritableSignal<string> = signal("pantoja");
       const callbackSpy = vi.fn<() => void>(() => {
@@ -39,13 +40,15 @@ describe("effect", () => {
       effect(callbackSpy);
 
       firstName.set("jorge");
+      await Promise.resolve();
       expect(callbackSpy).toHaveBeenCalledTimes(2);
 
       lastName.set("bustamante");
+      await Promise.resolve();
       expect(callbackSpy).toHaveBeenCalledTimes(3);
     });
 
-    it("reads the updated signal value on re-run", () => {
+    it("batches consecutive sets — effect re-runs once with the latest value", async () => {
       const counter: WritableSignal<number> = signal(0);
       const capturedValues: number[] = [];
       effect(() => {
@@ -54,13 +57,14 @@ describe("effect", () => {
 
       counter.set(1);
       counter.set(2);
+      await Promise.resolve();
 
-      expect(capturedValues).toEqual([0, 1, 2]);
+      expect(capturedValues).toEqual([0, 2]);
     });
   });
 
   describe("dynamic dependency tracking", () => {
-    it("stops tracking a signal that is no longer read", () => {
+    it("stops tracking a signal that is no longer read", async () => {
       const active: WritableSignal<boolean> = signal(true);
       const name: WritableSignal<string> = signal("gabriel");
       const callbackSpy = vi.fn<() => void>(() => {
@@ -69,14 +73,15 @@ describe("effect", () => {
       effect(callbackSpy);
 
       active.set(false);
+      await Promise.resolve(); // effect re-runs, name is now untracked
       const callsAfterDeactivation: number = callbackSpy.mock.calls.length;
 
       name.set("pantoja");
-
+      await Promise.resolve();
       expect(callbackSpy.mock.calls.length).toBe(callsAfterDeactivation);
     });
 
-    it("starts tracking a signal that becomes reachable", () => {
+    it("starts tracking a signal that becomes reachable", async () => {
       const active: WritableSignal<boolean> = signal(false);
       const name: WritableSignal<string> = signal("gabriel");
       const callbackSpy = vi.fn<() => void>(() => {
@@ -85,16 +90,17 @@ describe("effect", () => {
       effect(callbackSpy);
 
       active.set(true);
+      await Promise.resolve(); // effect re-runs, name is now tracked
       const callsAfterActivation: number = callbackSpy.mock.calls.length;
 
       name.set("pantoja");
-
+      await Promise.resolve();
       expect(callbackSpy.mock.calls.length).toBe(callsAfterActivation + 1);
     });
   });
 
   describe("cleanup", () => {
-    it("calls the cleanup function before re-running", () => {
+    it("calls the cleanup function before re-running", async () => {
       const counter: WritableSignal<number> = signal(0);
       const cleanupSpy = vi.fn<() => void>();
       effect((onCleanup) => {
@@ -105,9 +111,11 @@ describe("effect", () => {
       expect(cleanupSpy).not.toHaveBeenCalled();
 
       counter.set(1);
+      await Promise.resolve();
       expect(cleanupSpy).toHaveBeenCalledOnce();
 
       counter.set(2);
+      await Promise.resolve();
       expect(cleanupSpy).toHaveBeenCalledTimes(2);
     });
 
