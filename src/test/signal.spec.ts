@@ -1,6 +1,6 @@
 import { expect, it, describe, vi } from "vitest";
 import { signal } from "../lib/signal";
-import type { WritableSignal, Signal, Unsubscribe } from "../lib/signal";
+import type { WritableSignal, Signal, Unsubscribe } from "../lib/types";
 
 describe("signal", () => {
   describe("reading values", () => {
@@ -38,11 +38,12 @@ describe("signal", () => {
       expect(nickname()).toBe("gabdrum");
     });
 
-    it("notifies subscriber with the new value", () => {
+    it("notifies subscriber with the new value", async () => {
       const text: WritableSignal<string> = signal("a");
       const onChangeSpy = vi.fn<(value: string) => void>();
       text.subscribe(onChangeSpy);
       text.set("b");
+      await Promise.resolve();
       expect(onChangeSpy).toHaveBeenCalledOnce();
       expect(onChangeSpy).toHaveBeenCalledWith("b");
     });
@@ -79,13 +80,14 @@ describe("signal", () => {
       expect(onChangeSpy).not.toHaveBeenCalled();
     });
 
-    it("notifies subscriber after update", () => {
+    it("notifies subscriber after update", async () => {
       const message: WritableSignal<string> = signal("details");
       let lastCapturedValue: string = "";
       message.subscribe((value: string) => {
         lastCapturedValue = value;
       });
       message.update((prev: string) => prev + " extra");
+      await Promise.resolve();
       expect(lastCapturedValue).toBe("details extra");
     });
   });
@@ -98,13 +100,14 @@ describe("signal", () => {
       expect(onChangeSpy).not.toHaveBeenCalled();
     });
 
-    it("notifies all active subscribers", () => {
+    it("notifies all active subscribers", async () => {
       const counter: WritableSignal<number> = signal(0);
       const listenerA = vi.fn<(value: number) => void>();
       const listenerB = vi.fn<(value: number) => void>();
       counter.subscribe(listenerA);
       counter.subscribe(listenerB);
       counter.set(1);
+      await Promise.resolve();
       expect(listenerA).toHaveBeenCalledWith(1);
       expect(listenerB).toHaveBeenCalledWith(1);
     });
@@ -118,7 +121,7 @@ describe("signal", () => {
       expect(onChangeSpy).not.toHaveBeenCalled();
     });
 
-    it("only stops the unsubscribed listener, not others", () => {
+    it("only stops the unsubscribed listener, not others", async () => {
       const counter: WritableSignal<number> = signal(0);
       const listenerA = vi.fn<(value: number) => void>();
       const listenerB = vi.fn<(value: number) => void>();
@@ -126,6 +129,7 @@ describe("signal", () => {
       counter.subscribe(listenerB);
       unsubscribeA();
       counter.set(1);
+      await Promise.resolve();
       expect(listenerA).not.toHaveBeenCalled();
       expect(listenerB).toHaveBeenCalledWith(1);
     });
@@ -153,13 +157,10 @@ describe("signal", () => {
       expect(readonlySignal()).toBe("world");
     });
 
-    it("readonly can be subscribed and receives updates", () => {
-      const counter: WritableSignal<number> = signal(0);
-      const readonlySignal: Signal<number> = counter.asReadonly();
-      const onChangeSpy = vi.fn<(value: number) => void>();
-      readonlySignal.subscribe(onChangeSpy);
-      counter.set(1);
-      expect(onChangeSpy).toHaveBeenCalledWith(1);
+    it("readonly does not expose subscribe method", () => {
+      const numberSignal: WritableSignal<number> = signal(0);
+      const readonlySignal: Signal<number> = numberSignal.asReadonly();
+      expect((readonlySignal as unknown as Record<string, unknown>).subscribe).toBeUndefined();
     });
 
     it("readonly does not expose set method", () => {
