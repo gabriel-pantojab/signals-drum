@@ -1,9 +1,10 @@
 import { context } from "./context";
-import { signal } from "./signal";
-import type { Listener, Signal, Unsubscribe, WritableSignal } from "./types";
+import type { ContextListener, Signal, Unsubscribe } from "./types";
 
 export function computed<T>(callback: () => T): Signal<T> {
-  let internalSignal: WritableSignal<T> | undefined = undefined;
+  let value: T;
+  let isDirty: boolean = true;
+  const listeners: Set<ContextListener> = new Set<ContextListener>();
   const unsubscribes: Unsubscribe[] = [];
 
   const recompute: () => T = () => {
@@ -14,32 +15,52 @@ export function computed<T>(callback: () => T): Signal<T> {
       type: "computed",
       listener,
     });
-    const value = callback();
+    const recomputedValue: T = callback();
     unsubscribes.length = 0;
     unsubscribes.push(...context.getUnsubscribes());
     context.popLastListener();
-    return value;
+    return recomputedValue;
   };
 
   const listener: () => void = () => {
-    if (!internalSignal) return;
-
-    internalSignal.set(recompute());
+    isDirty = true;
+    context.startScheduling();
+    listeners.forEach((contextListener) => {
+      if (contextListener.type === "computed") {
+        contextListener.listener();
+      } else {
+        context.addPendingListener(contextListener.listener, value);
+      }
+    });
   };
 
-  const getSafeInternalSignal: () => WritableSignal<T> = () => {
-    if (!internalSignal) {
-      internalSignal = signal(recompute());
+  const subscribe: (listener: ContextListener) => Unsubscribe = (
+    listener: ContextListener,
+  ): Unsubscribe => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+
+  const trackInContext = (): void => {
+    const lastContextListener: ContextListener | undefined = context.getLastListener();
+
+    if (lastContextListener) {
+      const unsubscribe: Unsubscribe = subscribe(lastContextListener);
+      context.addUnsubscribe(unsubscribe);
     }
-    return internalSignal;
   };
 
-  const readonlySignal: Signal<T> = () => {
-    return getSafeInternalSignal()();
-  };
+  const readonlySignal: Signal<T> = (): T => {
+    if (isDirty) {
+      value = recompute();
+      isDirty = false;
+    }
 
-  readonlySignal.subscribe = (listener: Listener<T>) => {
-    return getSafeInternalSignal().subscribe(listener);
+    trackInContext();
+
+    return value;
   };
 
   return readonlySignal;
