@@ -20,6 +20,18 @@ describe("computed", () => {
   });
 
   describe("reactivity", () => {
+    it("does not recompute when read multiple times without dependency changes", () => {
+      const counter: WritableSignal<number> = signal(0);
+      const computeSpy = vi.fn<() => number>(() => counter() * 2);
+      const doubled: Signal<number> = computed(computeSpy);
+
+      doubled();
+      doubled();
+      doubled();
+
+      expect(computeSpy).toHaveBeenCalledOnce();
+    });
+
     it("updates when a dependency changes", () => {
       const name: WritableSignal<string> = signal("gabriel");
       const upperName: Signal<string> = computed(() => name().toUpperCase());
@@ -49,9 +61,9 @@ describe("computed", () => {
       expect(computeSpy).toHaveBeenCalledOnce();
 
       counter.set(1);
-      expect(computeSpy).toHaveBeenCalledOnce(); // lazy — dep changed but not yet read
+      expect(computeSpy).toHaveBeenCalledTimes(2); // eager — recomputed immediately on dep change
       doubled();
-      expect(computeSpy).toHaveBeenCalledTimes(2);
+      expect(computeSpy).toHaveBeenCalledTimes(2); // cached — no recompute on read
     });
   });
 
