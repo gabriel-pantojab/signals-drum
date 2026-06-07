@@ -23,15 +23,21 @@ export function computed<T>(callback: () => T): Signal<T> {
   };
 
   const listener: () => void = () => {
-    isDirty = true;
+    const newValue: T = recompute();
+    if (value === newValue) return;
+    value = newValue;
+
     context.startScheduling();
-    listeners.forEach((contextListener) => {
+    // Use a snapshot of the current listeners to prevent mutations
+    // during notification dispatch from affecting this iteration.
+    [...listeners].forEach((contextListener) => {
       if (contextListener.type === "computed") {
         contextListener.listener();
       } else {
         context.addPendingListener(contextListener.listener, value);
       }
     });
+    isDirty = false;
   };
 
   const subscribe: (listener: ContextListener) => Unsubscribe = (
